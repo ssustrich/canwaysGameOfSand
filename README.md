@@ -3,7 +3,7 @@
 ## Running
 
 ```bash
-cargo run --release --package conwayGOS
+cargo run --release --package conway_gos
 ```
 
 ## Controls

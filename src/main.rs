@@ -7,7 +7,7 @@ use winit::dpi::{LogicalPosition, LogicalSize, PhysicalSize};
 use winit::event::{Event, VirtualKeyCode};
 use winit::event_loop::{ControlFlow, EventLoop};
 use winit_input_helper::WinitInputHelper;
-use rand::Rng; // 0.8.0
+
 
 const SCREEN_WIDTH: u32 = 300;
 const SCREEN_HEIGHT: u32 = 300;
@@ -286,46 +286,12 @@ impl ConwayGrid {
         }
     }
 
-    fn count_neibs(&self, x: usize, y: usize) -> usize {
-        let (xm1, xp1) = if x == 0 {
-            (self.width - 1, x + 1)
-        } else if x == self.width - 1 {
-            (x - 1, 0)
-        } else {
-            (x - 1, x + 1)
-        };
-        let (ym1, yp1) = if y == 0 {
-            (self.height - 1, y + 1)
-        } else if y == self.height - 1 {
-            (y - 1, 0)
-        } else {
-            (y - 1, y + 1)
-        };
-        self.particles[xm1 + ym1 * self.width].active as usize
-        + self.particles[x + ym1 * self.width].active as usize
-            +self.particles[xp1 + ym1 * self.width].active as usize// should be cell under curent cell
-            + self.particles[xm1 + y * self.width].active as usize
-            + self.particles[xp1 + y * self.width].active as usize
-            + self.particles[xm1 + yp1 * self.width].active as usize
-            + self.particles[x + yp1 * self.width].active as usize
-            + self.particles[xp1 + yp1 * self.width].active as usize
-    }
-
-//    fn get_idx_for_under_cell(&self, x: usize, y: usize) -> usize {
-//
-//        let idx: usize = x + yp1 * self.width; 
-//        return idx;
-//
-//    }
-
-
     fn update(&mut self) {
     
         for y in 0..self.height {
             for x in 0..self.width {
                 //let neibs = self.count_neibs(x, y);
                 let idx = x + y * self.width;
-                let next = self.particles[idx];
                //  println!("Checking for alive cell at index {}", idx);
                   if self.particles[idx].active 
                   && idx +self.width < self.particles.len()  
