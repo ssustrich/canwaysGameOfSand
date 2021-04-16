@@ -7,10 +7,14 @@ use winit::dpi::{LogicalPosition, LogicalSize, PhysicalSize};
 use winit::event::{Event, VirtualKeyCode};
 use winit::event_loop::{ControlFlow, EventLoop};
 use winit_input_helper::WinitInputHelper;
-
+use rand::Rng;
 
 const SCREEN_WIDTH: u32 = 300;
 const SCREEN_HEIGHT: u32 = 300;
+const INITIAL_FILL: f32 = 10.0;
+const PARTICLETYPES: [&str; 2]= ["SAND", "WATER"];
+const GRAVITY: f32 = 9.8;
+
 
 fn main() -> Result<(), Error> {
     env_logger::init();
@@ -127,14 +131,7 @@ fn main() -> Result<(), Error> {
 
 // COPYPASTE: ideally this could be shared.
 
-/// Create a window for the game.
-///
-/// Automatically scales the window to cover about 2/3 of the monitor height.
-///
-/// # Returns
-///
-/// Tuple of `(window, surface, width, height, hidpi_factor)`
-/// `width` and `height` are in `PhysicalSize` units.
+//Methods for managaing meta game processes. Like opening a window or taking user input etc
 fn create_window(
     title: &str,
     event_loop: &EventLoop<()>,
@@ -183,6 +180,8 @@ fn create_window(
     )
 }
 
+
+
 /// Generate a pseudorandom seed for the game's PRNG.
 fn generate_seed() -> (u64, u64) {
     use byteorder::{ByteOrder, NativeEndian};
@@ -198,31 +197,30 @@ fn generate_seed() -> (u64, u64) {
     )
 }
 
-const INITIAL_FILL: f32 = 10.0;
+
 
 #[derive(Clone, Copy, Debug, Default)]
 struct Particle {
+
+    p_type: usize,
     active: bool,
     already_updated: bool,
-    // Used for the trail effect. Always 255 if `self.alive` is true (We could
-    // use an enum for Cell, but it makes several functions slightly more
-    // complex, and doesn't actually make anything any simpler here, or save any
-    // memory, so we don't)
     heat: u8,
+    velocity: f32,
 }
 
 impl Particle {
-    fn new(active: bool, already_updated: bool) -> Self {
-        Self { active, already_updated, heat: 0 }
+    fn new(p_type: usize) -> Self{
+        Self {p_type, active: true, already_updated: false, heat: 0, velocity: 0.0} 
     }
-
+    
     #[must_use]
     fn next_state(mut self, active: bool) -> Self {
         self.active = active;
         if self.active {
-            self.heat = 255;
+            self.heat = 0;
         } else {
-            self.heat = self.heat.saturating_sub(1);
+            self.heat = 0;
         }
         self
     }
@@ -273,7 +271,9 @@ impl ConwayGrid {
         let mut rng: randomize::PCG32 = generate_seed().into();
         for c in self.particles.iter_mut() {
             let alive = randomize::f32_half_open_right(rng.next_u32()) > INITIAL_FILL;
-            *c = Particle::new(alive, false);
+            let mut rng1 = rand::thread_rng();
+     //      println!("Integer: {}", rng1.gen_range(0..PARTICLETYPES.len());
+            *c = Particle::new(rng1.gen_range(0..PARTICLETYPES.len()));
         }
         // run a few simulation iterations for aesthetics (If we don't, the
         // noise is ugly)
@@ -286,7 +286,12 @@ impl ConwayGrid {
         }
     }
 
-    fn update(&mut self) {
+    fn update (&mut self) {
+        if self.particles
+         self;
+    }
+
+    fn update_sand(&mut self) {
     
         for y in 0..self.height {
             for x in 0..self.width {
@@ -371,6 +376,13 @@ impl ConwayGrid {
                 break;
             }
         }
+    }
+
+
+    fn getXYfromInx(&self, idx:usize)->(usize, usize){
+       let row: usize = idx / self.width;
+       let column: usize = idx / self.width; 
+       (row, column,)
     }
 
     fn grid_idx<I: std::convert::TryInto<usize>>(&self, x: I, y: I) -> Option<usize> {
