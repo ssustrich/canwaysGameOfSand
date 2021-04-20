@@ -3,21 +3,23 @@
 
 use log::{debug, error};
 use pixels::{Error, Pixels, SurfaceTexture};
+use rand::Rng;
 use winit::dpi::{LogicalPosition, LogicalSize, PhysicalSize};
 use winit::event::{Event, VirtualKeyCode};
 use winit::event_loop::{ControlFlow, EventLoop};
 use winit_input_helper::WinitInputHelper;
-use rand::Rng;
 
-const SCREEN_WIDTH: u32 = 3;
-const SCREEN_HEIGHT: u32 = 3;
+const SCREEN_WIDTH: u32 = 5;
+const SCREEN_HEIGHT: u32 = 5;
 const INITIAL_FILL: f32 = 0.9;
-const PARTICLETYPES: [&str; 3]= ["NONE", "SAND", "WATER"];
+const PARTICLETYPES: [&str; 3] = ["NONE", "SAND", "WATER"];
 const GRAVITY: f32 = 9.8;
-enum  OBJECT_TYPES {
-EMPTY, WALL,  SAND, WATER,
+enum OBJECT_TYPES {
+    EMPTY,
+    WALL,
+    SAND,
+    WATER,
 }
-
 
 fn main() -> Result<(), Error> {
     env_logger::init();
@@ -183,8 +185,6 @@ fn create_window(
     )
 }
 
-
-
 /// Generate a pseudorandom seed for the game's PRNG.
 fn generate_seed() -> (u64, u64) {
     use byteorder::{ByteOrder, NativeEndian};
@@ -200,11 +200,8 @@ fn generate_seed() -> (u64, u64) {
     )
 }
 
-
-
 #[derive(Clone, Copy, Debug, Default)]
 struct Particle {
-
     p_type: usize,
     active: bool,
     already_updated: bool,
@@ -212,12 +209,17 @@ struct Particle {
     velocity: f32,
 }
 
-
 impl Particle {
-    fn new(p_type: usize, active: bool) -> Self{
-        Self {p_type, active, already_updated: false, heat: 0, velocity: 0.0} 
+    fn new(p_type: usize, active: bool) -> Self {
+        Self {
+            p_type,
+            active,
+            already_updated: false,
+            heat: 0,
+            velocity: 0.0,
+        }
     }
-    
+
     #[must_use]
     fn next_state(mut self, active: bool) -> Self {
         self.active = active;
@@ -276,7 +278,7 @@ impl ConwayGrid {
         for c in self.particles.iter_mut() {
             let alive = randomize::f32_half_open_right(rng.next_u32()) > INITIAL_FILL;
             let mut rng1 = rand::thread_rng();
-           //println!("Integer: {}", rng1.gen_range(0..PARTICLETYPES.len());
+            //println!("Integer: {}", rng1.gen_range(0..PARTICLETYPES.len());
             *c = Particle::new(rng1.gen_range(0..PARTICLETYPES.len()), alive);
         }
         // run a few simulation iterations for aesthetics (If we don't, the
@@ -289,50 +291,48 @@ impl ConwayGrid {
             c.cool_off(0.4);
         }
     }
-    
+
     fn update(&mut self) {
-    
         for y in 0..self.height {
             for x in 0..self.width {
                 //let neibs = self.count_neibs(x, y);
                 let idx = x + y * self.width;
-                println!("Checking for alive cell [{}{}] at index {}", x,y,idx,);
+                println!("Checking for alive cell [{}{}] at index {}", x, y, idx,);
                 self.getEightNeighbors(idx);
-                  if self.particles[idx].active 
-                  && idx +self.width < self.particles.len()  
-                  && self.particles[idx + self.width].already_updated == false
-                  && self.particles[idx].already_updated == false
-                  {
-                      //  println!("Cell at index {} is alive", idx);
+                if self.particles[idx].active
+                    && idx + self.width < self.particles.len()
+                    && self.particles[idx + self.width].already_updated == false
+                    && self.particles[idx].already_updated == false
+                {
+                    //  println!("Cell at index {} is alive", idx);
                     //    println!("Killing cell and dropping particle to the cell bellow us at {}", idx+self.width);
-                          if  self.particles[idx + self.width].active == false{
-                            //let num = rand::thread_rng().gen_range(0..2);
-                            self.particles[idx + self.width].active = true;
-                            self.particles[idx + self.width].already_updated = true;
-                            self.particles[idx].active = false;
-                          }
-                         // else if (idx + self.width -1) < self.cells.len() 
-                         // && (idx + self.width) % self.width != 0
-                         // && self.cells[idx + self.width -1].alive == false
-                         // {
-                         //   self.cells[idx + self.width -1].alive = true;
-                         //   self.cells[idx + self.width].already_updated = true;
-                         //   self.cells[idx].alive = false;
-                        //  }
-                        //  else if (idx + self.width +1) < self.cells.len() 
-                        //  && (idx + self.width) % self.width != 0
-                        //  && self.cells[idx + self.width +1].alive == false
-                        //  {
-                        //    self.cells[idx + self.width +1].alive = true;
-                        //    self.cells[idx + self.width].already_updated = true;
-                        //    self.cells[idx].alive = false;
-                        //  }
-
-                  }         
+                    if self.particles[idx + self.width].active == false {
+                        //let num = rand::thread_rng().gen_range(0..2);
+                        self.particles[idx + self.width].active = true;
+                        self.particles[idx + self.width].already_updated = true;
+                        self.particles[idx].active = false;
+                    }
+                    // else if (idx + self.width -1) < self.cells.len()
+                    // && (idx + self.width) % self.width != 0
+                    // && self.cells[idx + self.width -1].alive == false
+                    // {
+                    //   self.cells[idx + self.width -1].alive = true;
+                    //   self.cells[idx + self.width].already_updated = true;
+                    //   self.cells[idx].alive = false;
+                    //  }
+                    //  else if (idx + self.width +1) < self.cells.len()
+                    //  && (idx + self.width) % self.width != 0
+                    //  && self.cells[idx + self.width +1].alive == false
+                    //  {
+                    //    self.cells[idx + self.width +1].alive = true;
+                    //    self.cells[idx + self.width].already_updated = true;
+                    //    self.cells[idx].alive = false;
+                    //  }
+                }
             }
         }
-     //   std::mem::swap(&mut self.scratch_cells, &mut self.cells);
-//        println!("Do we get here?");
+        //   std::mem::swap(&mut self.scratch_cells, &mut self.cells);
+        //        println!("Do we get here?");
         for y in 0..self.height {
             for x in 0..self.width {
                 let idx = x + y * self.width;
@@ -378,14 +378,17 @@ impl ConwayGrid {
         }
     }
 
-
-    fn getXYfromInx(&self, idx: usize)->(usize, usize){
-       let row: usize = idx / self.width;
-       let column: usize = idx / self.width; 
-       (row, column)
+    fn getXYfromInx(&self, idx: usize) -> (usize, usize) {
+        let row: usize = idx / self.width;
+        let column: usize = idx / self.width;
+        (row, column)
     }
 
-    fn getEightNeighbors(&self, idx: usize) -> Vec<isize>{
+    fn getEightNeighbors(&self, idx: usize) -> Vec<isize> {
+        if idx == 6 {
+            println!("The width is {}", self.width);
+        }
+        println!("The width is {}", self.width);
         // let (x,y) = self.getXYfromInx(idx);
         let mut v: Vec<isize> = vec![-1; 8];
         // let mut x_to_check: usize = x as i32 - (-1);
@@ -397,19 +400,86 @@ impl ConwayGrid {
         //     }
 
         // }
-       // v[0]= idx.wrapping_sub(self.width - 1); 
-        
-        v[0] = (idx - self.width - 1) as isize;
-        v[1] = (idx - self.width) as isize; 
-        v[2] = (idx - self.width +1) as isize;
-        v[3] = (idx - 1) as isize;
-        v[5] = (idx + 1) as isize;
-        v[6] = (idx + self.width -1) as isize;
-        v[7] = (idx+self.width) as isize;
-        v[8] = (idx+self.width + 1) as isize;
+        // v[0]= idx.wrapping_sub(self.width - 1);
 
+        for x in 0..8 {
+            if x == 0 {
+                if idx <= self.width  || idx % self.width == 0  {
+                    v[0] = -1;
+                } else {
+                    v[0] = (idx - self.width - 1) as isize;
+                }
+            } else if x == 1 {
+                if idx <= self.width {
+                    v[1] =  -1;
+                } else {
+                    v[1] = (idx - self.width) as isize;
+                }
+            } else if x == 2   || idx + 1 % self.width == 0  {
+                if idx <= self.width {
+                    v[2] =  -1;
+                } else {
+                    v[2] = (idx - self.width + 1) as isize;
+                }
+            } else if x == 3 {
+                if idx % self.width == 0  {
+                    v[3] =  -1;
+                } else {
+                    v[3] = (idx - 1) as isize;
+                }
+            } else if x == 4 {
+                if idx + 1 % self.width == 0 {
+                    v[4] =  -1;
+                } else {
+                    v[4] = (idx + 1) as isize;
+                }
+            } else if x == 5 {
+                if idx + 1 % self.width == 0 {
+                    v[5] =  -1;
+                } else {
+                    v[5] = (idx + self.width - 1) as isize;
+                }
+            } else if x == 6 {
+                v[6] = (idx + self.width) as isize;
+            } else if x == 7 {
+                if idx + 1 % self.width == 0 {
+                    v[7] =  -1;
+                } else {
+                    v[7] = (idx + self.width + 1) as isize;
+                }
+            }
+        }
+        // if idx <= self.width {
+        //     v[0] = -1;
+        //     v[1] = -1;
+        //     v[2] = -1;
+        // } else {
+        //     v[0] = (idx - self.width - 1) as isize;
+        //     v[1] = (idx - self.width) as isize;
+        //     v[2] = (idx - self.width + 1) as isize;
+        // }
+        // if idx + 1 % self.width == 0 {
+        //     v[0] = -1;
+        //     v[3] = -1;
+        //     v[5] = -1;
+        // } else {
+        //     v[0] = (idx - self.width - 1) as isize;
+        //     v[3] = (idx - 1) as isize;
+        //     v[5] = (idx + self.width - 1) as isize;
+        // }
+
+        // if idx + 1 % self.width == 0 {
+        //     v[2] = (idx - self.width + 1) as isize;
+        //     v[4] = (idx + 1) as isize;
+        //     v[7] = (idx + self.width + 1) as isize;
+        // } else {
+        //     v[2] = (idx - self.width + 1) as isize;
+        //     v[4] = (idx + 1) as isize;
+        //     v[7] = (idx + self.width + 1) as isize;
+        // }
+
+        // v[6] = (idx + self.width) as isize;
         println!("The eight neighbors of {} are {:?}", idx, v);
-
         v
     }
 
