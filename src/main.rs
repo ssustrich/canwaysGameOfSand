@@ -219,7 +219,7 @@ impl Particle {
             p_type,
             active,
             already_updated: false,
-            velocity: 0.0,
+            velocity: 1.0,
         }
     }
 
@@ -284,8 +284,52 @@ impl ConwayGrid {
                 //let neibs = self.count_neibs(x, y);
              //  println!("Checking for alive cell at index {:?}", self.particles[idx]);
                //self.printCrazy8(v, idx);
-                if self.particles[idx].active
-                    && idx + self.width < self.particles.len()
+
+               if !self.particles[idx].already_updated && self.particles[idx].active { 
+                log::debug!("{:?}", self.particles[idx]);
+                //check to see if we can move down
+                let mut v: Vec<isize> = self.getEightNeighbors(idx);
+                let mut bi = v[2];
+                let mut bl = v[3];
+                let mut br = v[1];
+                
+                //we hit the bottom
+                if bi == -1 {
+                    self.particles[idx].active = true; 
+                    self.particles[idx].already_updated = true;
+                }
+                else if bi > -1 && self.particles[bi as usize].active == true {
+                    if rand::random(){
+                        bl ^= br;
+                        br ^= bl;
+                        bl ^= br;
+                    }
+               
+                    //check bl  (which may be swapped)
+                    if bl > -1 && self.particles[bi as usize].active == false{
+                        self.particles[idx].already_updated = true;
+                        self.particles[idx].active = false;
+                        self.particles[bl as usize].active = true;    
+                    }
+                    else if br > -1 && self.particles[br as usize].active == false{
+                        self.particles[idx].already_updated = true;
+                        self.particles[idx].active = false;
+                        self.particles[br as usize].active = true;    
+                    } else{
+                    self.particles[idx].already_updated = true;
+                    self.particles[idx].active = true; 
+                    }
+                }
+                else {
+                    self.particles[idx].already_updated = true;
+                    self.particles[idx].active = false;
+                    self.particles[bi as usize].active = true;
+                }
+
+               }
+
+/*
+                if self.particles[idx].active 
                     && self.particles[idx + self.width].already_updated == false
                     && self.particles[idx].already_updated == false {
                         
@@ -328,7 +372,7 @@ impl ConwayGrid {
                         self.particles[idx + self.width].already_updated = true;
                         self.particles[idx].active = false;
                     }
-                }
+                } */
         }
         for y in 0..self.height {
             for x in 0..self.width {
