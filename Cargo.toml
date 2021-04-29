@@ -14,7 +14,7 @@ env_logger = "0.8"
 getrandom = "0.2"
 line_drawing = "0.8"
 log = "0.4"
-pixels = { path = "../../../pixels",  version = "0.2.0" }
+pixels = "0.2.0"
 randomize = "3.0"
 winit = "0.24"
 winit_input_helper = "0.9"

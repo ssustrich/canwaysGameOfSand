@@ -1,16 +1,18 @@
 #![deny(clippy::all)]
 #![forbid(unsafe_code)]
 
-use log::{debug, error};
+use log::{debug, error, info, warn};
 use pixels::{Error, Pixels, SurfaceTexture};
 use rand::Rng;
 use winit::dpi::{LogicalPosition, LogicalSize, PhysicalSize};
 use winit::event::{Event, VirtualKeyCode};
 use winit::event_loop::{ControlFlow, EventLoop};
 use winit_input_helper::WinitInputHelper;
+use env_logger::Env;
 
-const SCREEN_WIDTH: u32 = 5;
-const SCREEN_HEIGHT: u32 = 5;
+
+const SCREEN_WIDTH: u32 = 300;
+const SCREEN_HEIGHT: u32 = 300;
 const INITIAL_FILL: f32 = 0.9;
 const PARTICLETYPES: [&str; 3] = ["NONE", "SAND", "WATER"];
 const GRAVITY: f32 = 9.8;
@@ -20,9 +22,10 @@ enum OBJECT_TYPES {
     SAND,
     WATER,
 }
-
 fn main() -> Result<(), Error> {
-    env_logger::init();
+    env_logger::Builder::from_env(Env::default().default_filter_or("error,conways_gos=warn,conways_gos=info/update")).init();
+    log::info!("World dimensions: {}x{}",SCREEN_WIDTH, SCREEN_HEIGHT );
+
     let event_loop = EventLoop::new();
     let mut input = WinitInputHelper::new();
     let (window, p_width, p_height, mut _hidpi_factor) =
@@ -30,7 +33,8 @@ fn main() -> Result<(), Error> {
 
     let surface_texture = SurfaceTexture::new(p_width, p_height, &window);
 
-    let mut frame = ConwayGrid::new_random(SCREEN_WIDTH as usize, SCREEN_HEIGHT as usize);
+    //let mut frame = ConwayGrid::new_random(SCREEN_WIDTH as usize, SCREEN_HEIGHT as usize);
+    let mut frame = ConwayGrid::new_empty(SCREEN_WIDTH as usize, SCREEN_HEIGHT as usize);
     let mut pixels = Pixels::new(SCREEN_WIDTH, SCREEN_HEIGHT, surface_texture)?;
     let mut paused = false;
 
@@ -124,7 +128,7 @@ fn main() -> Result<(), Error> {
             }
             // Resize the window
             if let Some(size) = input.window_resized() {
-                pixels.resize_surface(size.width, size.height);
+                pixels.resize(size.width, size.height);
             }
             if !paused || input.key_pressed(VirtualKeyCode::Space) {
                 frame.update();
@@ -201,11 +205,11 @@ fn generate_seed() -> (u64, u64) {
 }
 
 #[derive(Clone, Copy, Debug, Default)]
+/// The most basic element in teh game 
 struct Particle {
     p_type: usize,
     active: bool,
     already_updated: bool,
-    heat: u8,
     velocity: f32,
 }
 
@@ -215,7 +219,6 @@ impl Particle {
             p_type,
             active,
             already_updated: false,
-            heat: 0,
             velocity: 0.0,
         }
     }
@@ -223,24 +226,11 @@ impl Particle {
     #[must_use]
     fn next_state(mut self, active: bool) -> Self {
         self.active = active;
-        if self.active {
-            self.heat = 0;
-        } else {
-            self.heat = 0;
-        }
         self
     }
 
     fn set_active(&mut self, active: bool) {
         *self = self.next_state(active);
-    }
-
-    fn cool_off(&mut self, decay: f32) {
-        if !self.active {
-            let heat = (self.heat as f32 * decay).min(255.0).max(0.0);
-            assert!(heat.is_finite());
-            self.heat = heat as u8;
-        }
     }
 }
 
@@ -272,6 +262,7 @@ impl ConwayGrid {
         result.randomize();
         result
     }
+    
 
     fn randomize(&mut self) {
         let mut rng: randomize::PCG32 = generate_seed().into();
@@ -286,53 +277,59 @@ impl ConwayGrid {
         for _ in 0..3 {
             self.update();
         }
-        // Smooth out noise in the heatmap that would remain for a while
-        for c in self.particles.iter_mut() {
-            c.cool_off(0.4);
-        }
     }
 
     fn update(&mut self) {
-        for y in 0..self.height {
-            for x in 0..self.width {
+        for idx in (0..self.particles.len()).rev() {
                 //let neibs = self.count_neibs(x, y);
-                let idx = x + y * self.width;
-                println!("Checking for alive cell [{}{}] at index {}", x, y, idx,);
-                self.getEightNeighbors(idx);
+             //  println!("Checking for alive cell at index {:?}", self.particles[idx]);
+               //self.printCrazy8(v, idx);
                 if self.particles[idx].active
                     && idx + self.width < self.particles.len()
                     && self.particles[idx + self.width].already_updated == false
-                    && self.particles[idx].already_updated == false
-                {
-                    //  println!("Cell at index {} is alive", idx);
+                    && self.particles[idx].already_updated == false {
+                        
+                    let mut v: Vec<isize> = self.getEightNeighbors(idx);
+                    let belowIndex = v[2];
+                    if belowIndex > -1 && self.particles[belowIndex as usize].p_type == 0 {
+                        log::debug!("[update] do we come here?");
+                            //let num = rand::thread_rng().gen_range(0..2);
+                            self.particles[idx + self.width].active = true;
+                            self.particles[idx + self.width].already_updated = true;
+                            self.particles[idx].active = false;
+                        
+                    
+                    if belowIndex > -1 && self.particles[belowIndex as usize].active == true {
+                        let bl = v[3];
+                        let br = v[1];    
+                        if bl >-1 && self.particles[bl as usize].active == false{
+                            //let num = rand::thread_rng().gen_range(0..2);
+                            self.particles[bl as usize].active = true;
+                            self.particles[bl as usize].already_updated = true;
+                            self.particles[idx].active = false;
+                        }
+                        else if br >-1 && self.particles[br as usize].active == false{
+                            //let num = rand::thread_rng().gen_range(0..2);
+                            self.particles[br as usize].active = true;
+                            self.particles[br as usize].already_updated = true;
+                            self.particles[idx].active = false;
+                        }
+                    }
+                }
+                    //println!("Cell at index {}, x,y {},{} is alive", idx, x,y);
+                    
+                    
+                    //println!("converting x,y {},{} back to idx is {:?}", x,y, self.grid_idx(x,y));
                     //    println!("Killing cell and dropping particle to the cell bellow us at {}", idx+self.width);
+                    
                     if self.particles[idx + self.width].active == false {
                         //let num = rand::thread_rng().gen_range(0..2);
                         self.particles[idx + self.width].active = true;
                         self.particles[idx + self.width].already_updated = true;
                         self.particles[idx].active = false;
                     }
-                    // else if (idx + self.width -1) < self.cells.len()
-                    // && (idx + self.width) % self.width != 0
-                    // && self.cells[idx + self.width -1].alive == false
-                    // {
-                    //   self.cells[idx + self.width -1].alive = true;
-                    //   self.cells[idx + self.width].already_updated = true;
-                    //   self.cells[idx].alive = false;
-                    //  }
-                    //  else if (idx + self.width +1) < self.cells.len()
-                    //  && (idx + self.width) % self.width != 0
-                    //  && self.cells[idx + self.width +1].alive == false
-                    //  {
-                    //    self.cells[idx + self.width +1].alive = true;
-                    //    self.cells[idx + self.width].already_updated = true;
-                    //    self.cells[idx].alive = false;
-                    //  }
                 }
-            }
         }
-        //   std::mem::swap(&mut self.scratch_cells, &mut self.cells);
-        //        println!("Do we get here?");
         for y in 0..self.height {
             for x in 0..self.width {
                 let idx = x + y * self.width;
@@ -343,9 +340,9 @@ impl ConwayGrid {
 
     fn toggle(&mut self, x: isize, y: isize) -> bool {
         if let Some(i) = self.grid_idx(x, y) {
-            let was_alive = self.particles[i].active;
-            self.particles[i].set_active(!was_alive);
-            !was_alive
+            let was_active = self.particles[i].active;
+            self.particles[i].set_active(!was_active);
+            !was_active
         } else {
             false
         }
@@ -357,7 +354,7 @@ impl ConwayGrid {
             let color = if c.active {
                 [0, 0xff, 0xff, 0xff]
             } else {
-                [0, 0, c.heat, 0xff]
+                [0, 0, 0, 0xff]
             };
             pix.copy_from_slice(&color);
         }
@@ -379,108 +376,66 @@ impl ConwayGrid {
     }
 
     fn getXYfromInx(&self, idx: usize) -> (usize, usize) {
-        let row: usize = idx / self.width;
+        let row: usize = idx % self.width;
         let column: usize = idx / self.width;
         (row, column)
     }
 
+
+
+            /* Given an index in the array of X this function will return the index on the 8
+        neighbors in an array of len 8 where array[0] is the cell to the immediate right of ?
+        and the continue in a clowise fashion. If the cell is touching an edge of the game board the value 
+        for neighbors that are off the board is -1
+
+        [5]  [6]  [7]
+
+        [4]   X   [0]
+
+        [3]  [2]  [1]
+
+
+        Example 1) Cell X is in the middle of a 3x3 game board
+
+        idx = 4 and the board would look like this
+        0  1  2
+        3  4  5
+        6  7  8
+        The returned vector is <5,8,7,6,3,0,1,2>
+
+        Example 2) Cell X is in the upper left corner of a 3x3 board
+        idx = 0 and the board would look like this, remember -1 indicataes a wall or edge
+        -1 -1 -1
+        -1  0  1
+        -1  3  4
+        The returned vector is <1,4,3,-1,-1,-1,-1,-1>
+
+        */
     fn getEightNeighbors(&self, idx: usize) -> Vec<isize> {
-        if idx == 6 {
-            println!("The width is {}", self.width);
-        }
-        println!("The width is {}", self.width);
-        // let (x,y) = self.getXYfromInx(idx);
+        let coord = self.getXYfromInx(idx);
         let mut v: Vec<isize> = vec![-1; 8];
-        // let mut x_to_check: usize = x as i32 - (-1);
-        // let mut y_to_check: usize = y as i32 - (-1);
-        // for y in 0..8{
-        //     for x in 0..8{
-        //         v[x as usize +y as usize] = self.grid_idx(x_to_check as i32, y_to_check as i32);
-        //         x_to_check +=1;
-        //     }
+        log::info!("[getEightNeighbors] Called with indx:{}, which maps to x,y:{:?}",idx, coord);
+        //println!("{}{:?}",idx, coord );
 
-        // }
-        // v[0]= idx.wrapping_sub(self.width - 1);
-
-        for x in 0..8 {
-            if x == 0 {
-                if idx <= self.width  || idx % self.width == 0  {
-                    v[0] = -1;
-                } else {
-                    v[0] = (idx - self.width - 1) as isize;
-                }
-            } else if x == 1 {
-                if idx <= self.width {
-                    v[1] =  -1;
-                } else {
-                    v[1] = (idx - self.width) as isize;
-                }
-            } else if x == 2   || idx + 1 % self.width == 0  {
-                if idx <= self.width {
-                    v[2] =  -1;
-                } else {
-                    v[2] = (idx - self.width + 1) as isize;
-                }
-            } else if x == 3 {
-                if idx % self.width == 0  {
-                    v[3] =  -1;
-                } else {
-                    v[3] = (idx - 1) as isize;
-                }
-            } else if x == 4 {
-                if idx + 1 % self.width == 0 {
-                    v[4] =  -1;
-                } else {
-                    v[4] = (idx + 1) as isize;
-                }
-            } else if x == 5 {
-                if idx + 1 % self.width == 0 {
-                    v[5] =  -1;
-                } else {
-                    v[5] = (idx + self.width - 1) as isize;
-                }
-            } else if x == 6 {
-                v[6] = (idx + self.width) as isize;
-            } else if x == 7 {
-                if idx + 1 % self.width == 0 {
-                    v[7] =  -1;
-                } else {
-                    v[7] = (idx + self.width + 1) as isize;
-                }
-            }
-        }
-        // if idx <= self.width {
-        //     v[0] = -1;
-        //     v[1] = -1;
-        //     v[2] = -1;
-        // } else {
-        //     v[0] = (idx - self.width - 1) as isize;
-        //     v[1] = (idx - self.width) as isize;
-        //     v[2] = (idx - self.width + 1) as isize;
-        // }
-        // if idx + 1 % self.width == 0 {
-        //     v[0] = -1;
-        //     v[3] = -1;
-        //     v[5] = -1;
-        // } else {
-        //     v[0] = (idx - self.width - 1) as isize;
-        //     v[3] = (idx - 1) as isize;
-        //     v[5] = (idx + self.width - 1) as isize;
-        // }
-
-        // if idx + 1 % self.width == 0 {
-        //     v[2] = (idx - self.width + 1) as isize;
-        //     v[4] = (idx + 1) as isize;
-        //     v[7] = (idx + self.width + 1) as isize;
-        // } else {
-        //     v[2] = (idx - self.width + 1) as isize;
-        //     v[4] = (idx + 1) as isize;
-        //     v[7] = (idx + self.width + 1) as isize;
-        // }
-
-        // v[6] = (idx + self.width) as isize;
-        println!("The eight neighbors of {} are {:?}", idx, v);
+        v[0] = if coord.0 == self.width-1 { -1 } else { (idx+1) as isize };
+        v[1] = if coord.0 == self.width-1 || coord.1 == self.height -1 { -1 } else {(idx + 1 + self.width) as isize};
+        v[2] = if coord.1 == self.height -1 { -1 } else { (idx+ self.width) as isize };
+        v[3] = if coord.0 == 0 || coord.1 == self.height -1 { -1 } else { (idx+ self.width -1 ) as isize };
+        v[4] = if coord.0 == 0 {-1} else {(idx-1) as isize};
+        v[5] = if coord.1 == 0 || coord.0 == 0 {-1} else {(idx - 1 - self.width) as isize};
+        v[6] = if coord.1 == 0 {-1} else {(idx - self.width) as isize};
+        v[7] = if coord.0 == self.width-1 || coord.1 == 0 {-1} else {(idx + 1 - self.width) as isize};
+        log::debug!("[getEightNeighbors] {:?}",v);
         v
+    }
+
+    fn printCrazy8(&self, x: Vec<isize>, idx: usize){
+
+        println!();
+        println!("{} {} {}",x[5], x[6], x[7] );
+        println!("{} {} {}",x[4], idx, x[0]);
+        println!("{} {} {}",x[3],x[2], x[1]);
+        println!();
     }
 
     fn grid_idx<I: std::convert::TryInto<usize>>(&self, x: I, y: I) -> Option<usize> {
@@ -495,3 +450,23 @@ impl ConwayGrid {
         }
     }
 }
+
+/*
+fn main() {
+
+    let a:i32 = 0;
+    let b:i32 = 100;
+    let width:i32 = 10;
+    let mut c:i8  = 0;
+    for x in a..b{ 
+        if x<width{
+             c = (x.overflowing_sub(width)).0 as i8;
+        }
+        else{
+            c = (x-width) as i8;
+            }
+        println!("{}", c);
+    }
+    }
+
+    */
