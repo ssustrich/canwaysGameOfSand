@@ -11,8 +11,8 @@ use winit_input_helper::WinitInputHelper;
 use env_logger::Env;
 
 
-const SCREEN_WIDTH: u32 = 300;
-const SCREEN_HEIGHT: u32 = 300;
+const SCREEN_WIDTH: u32 = 1;
+const SCREEN_HEIGHT: u32 = 4;
 const INITIAL_FILL: f32 = 0.9;
 const PARTICLETYPES: [&str; 3] = ["NONE", "SAND", "WATER"];
 const GRAVITY: f32 = 9.8;
@@ -22,6 +22,7 @@ enum OBJECT_TYPES {
     SAND,
     WATER,
 }
+
 fn main() -> Result<(), Error> {
     env_logger::Builder::from_env(Env::default().default_filter_or("error,conways_gos=warn,conways_gos=info/update")).init();
     log::info!("World dimensions: {}x{}",SCREEN_WIDTH, SCREEN_HEIGHT );
@@ -68,6 +69,15 @@ fn main() -> Result<(), Error> {
             if input.key_pressed(VirtualKeyCode::Space) {
                 // Space is frame-step, so ensure we're paused
                 paused = true;
+            }
+            if input.key_pressed(VirtualKeyCode::R) {
+                frame.randomize();
+            }
+            if input.key_pressed(VirtualKeyCode::Key1) {
+                frame.set_brush_type(1)
+            }
+            if input.key_pressed(VirtualKeyCode::Key2) {
+                frame.set_brush_type(2)
             }
             if input.key_pressed(VirtualKeyCode::R) {
                 frame.randomize();
@@ -239,6 +249,7 @@ struct ConwayGrid {
     particles: Vec<Particle>,
     width: usize,
     height: usize,
+    active_type: usize,
     // Should always be the same size as `cells`. When updating, we read from
     // `cells` and write to `scratch_cells`, then swap. Otherwise it's not in
     // use, and `cells` should be updated directly.
@@ -252,9 +263,13 @@ impl ConwayGrid {
         Self {
             particles: vec![Particle::default(); size],
             scratch_cells: vec![Particle::default(); size],
+            active_type: 1,
             width,
             height,
         }
+    }
+    fn set_brush_type(&mut self, brush_type: usize){
+        self.active_type = brush_type;
     }
 
     fn new_random(width: usize, height: usize) -> Self {
@@ -267,10 +282,9 @@ impl ConwayGrid {
     fn randomize(&mut self) {
         let mut rng: randomize::PCG32 = generate_seed().into();
         for c in self.particles.iter_mut() {
-            let alive = randomize::f32_half_open_right(rng.next_u32()) > INITIAL_FILL;
             let mut rng1 = rand::thread_rng();
             //println!("Integer: {}", rng1.gen_range(0..PARTICLETYPES.len());
-            *c = Particle::new(rng1.gen_range(0..PARTICLETYPES.len()), alive);
+            *c = Particle::new(rng1.gen_range(0..PARTICLETYPES.len()), true);
         }
         // run a few simulation iterations for aesthetics (If we don't, the
         // noise is ugly)
@@ -279,113 +293,153 @@ impl ConwayGrid {
         }
     }
 
+    fn update_water(&mut self, idx: usize){
+        log::debug!("{:?}", self.particles[idx]);
+        //check to see if we can move down
+        let mut v: Vec<isize> = self.getEightNeighbors(idx);
+        let mut ui = v[6];
+        let mut ul = v[5];
+        let mut ur = v[7];
+        
+        //we hit the bottom
+        if ui == -1 {
+            self.particles[idx].active = true; 
+            self.particles[idx].already_updated = true;
+        }
+        else if ui > -1 && self.particles[ui as usize].active {
+            if rand::random(){
+                ul ^= ur;
+                ur ^= ul;
+                ul ^= ur;
+            }
+       
+            //check bl  (which may be swapped)
+            if ul > -1 && !self.particles[ui as usize].active {
+                self.particles[idx].already_updated = true;
+                self.particles[idx].active = false;
+                self.particles[ul as usize].active = true;
+                self.particles[ul as usize].p_type = self.particles[idx].p_type;
+                self.particles[idx].p_type = 0;
+            }
+            else if ur > -1 && !self.particles[ur as usize].active {
+                self.particles[idx].already_updated = true;
+                self.particles[idx].active = false;
+                self.particles[ur as usize].active = true;
+                self.particles[ur as usize].p_type = self.particles[idx].p_type;
+                self.particles[idx].p_type = 0;
+
+
+            } else{
+            self.particles[idx].already_updated = true;
+            self.particles[idx].active = true; 
+            }
+        }
+        else {
+            self.particles[idx].already_updated = true;
+            self.particles[idx].active = false;
+
+            self.particles[ui as usize].active = true;
+            self.particles[ui as usize].p_type = self.particles[idx].p_type;
+            self.particles[idx].p_type = 0;
+        }
+
+
+    }
+    fn update_sand(&mut self, idx: usize){ 
+
+        log::debug!("{:?}", self.particles[idx]);
+        //check to see if we can move down
+        let mut v: Vec<isize> = self.getEightNeighbors(idx);
+        let mut bi = v[2];
+        let mut bl = v[3];
+        let mut br = v[1];
+        
+        //we hit the bottom
+        if bi == -1 {
+            self.particles[idx].active = false; 
+            self.particles[idx].already_updated = true;
+        }
+        else /*&& self.particles[bi as usize].active */{
+            // if rand::random(){
+            //     bl ^= br;
+            //     br ^= bl;
+            //     bl ^= br;
+            // }
+       
+            //check bl  (which may be swapped)
+/*            if bl > -1 && !self.particles[bi as usize].active {
+                self.particles[idx].already_updated = true;
+               // self.particles[idx].active = false;
+             //   self.particles[bl as usize].active = true;
+                self.particles[bl as usize].p_type = self.particles[idx].p_type;
+                self.particles[idx].p_type = 0;
+            }
+            else if br > -1 && !self.particles[br as usize].active {
+                self.particles[idx].already_updated = true;
+              //  self.particles[idx].active = false;
+             //   self.particles[br as usize].active = true;
+                self.particles[br as usize].p_type = self.particles[idx].p_type;
+                self.particles[idx].p_type = 0;
+
+
+            } */
+            
+          //  else{
+            self.particles[idx].already_updated = true;
+            if !self.particles[bi as usize].p_type == 0{
+              self.particles[idx].active = self.particles[bi as usize].active;
+            }
+            else {
+                self.particles[idx].already_updated = true;
+                self.particles[idx].active = false;
+    
+                self.particles[bi as usize].active = true;
+                self.particles[bi as usize].p_type = self.particles[idx].p_type;
+                self.particles[idx].p_type = 0;
+            }
+        }
+        // else {
+        //     self.particles[idx].already_updated = true;
+        //     self.particles[idx].active = false;
+
+        //     self.particles[bi as usize].active = true;
+        //     self.particles[bi as usize].p_type = self.particles[idx].p_type;
+        //     self.particles[idx].p_type = 0;
+        // }
+
+       }
+
     fn update(&mut self) {
         for idx in (0..self.particles.len()).rev() {
                 //let neibs = self.count_neibs(x, y);
              //  println!("Checking for alive cell at index {:?}", self.particles[idx]);
                //self.printCrazy8(v, idx);
 
-               if !self.particles[idx].already_updated && self.particles[idx].active { 
-                log::debug!("{:?}", self.particles[idx]);
-                //check to see if we can move down
-                let mut v: Vec<isize> = self.getEightNeighbors(idx);
-                let mut bi = v[2];
-                let mut bl = v[3];
-                let mut br = v[1];
-                
-                //we hit the bottom
-                if bi == -1 {
-                    self.particles[idx].active = true; 
-                    self.particles[idx].already_updated = true;
-                }
-                else if bi > -1 && self.particles[bi as usize].active == true {
-                    if rand::random(){
-                        bl ^= br;
-                        br ^= bl;
-                        bl ^= br;
-                    }
-               
-                    //check bl  (which may be swapped)
-                    if bl > -1 && self.particles[bi as usize].active == false{
-                        self.particles[idx].already_updated = true;
-                        self.particles[idx].active = false;
-                        self.particles[bl as usize].active = true;    
-                    }
-                    else if br > -1 && self.particles[br as usize].active == false{
-                        self.particles[idx].already_updated = true;
-                        self.particles[idx].active = false;
-                        self.particles[br as usize].active = true;    
-                    } else{
-                    self.particles[idx].already_updated = true;
-                    self.particles[idx].active = true; 
-                    }
-                }
-                else {
-                    self.particles[idx].already_updated = true;
-                    self.particles[idx].active = false;
-                    self.particles[bi as usize].active = true;
-                }
+               if !self.particles[idx].already_updated && self.particles[idx].active {
 
+                if self.particles[idx].p_type ==1 {
+                    self.update_sand(idx);
+                }
+                else if self.particles[idx].p_type ==2 {
+                    self.update_sand(idx);
+                }
                }
+        }
 
-/*
-                if self.particles[idx].active 
-                    && self.particles[idx + self.width].already_updated == false
-                    && self.particles[idx].already_updated == false {
-                        
-                    let mut v: Vec<isize> = self.getEightNeighbors(idx);
-                    let belowIndex = v[2];
-                    if belowIndex > -1 && self.particles[belowIndex as usize].p_type == 0 {
-                        log::debug!("[update] do we come here?");
-                            //let num = rand::thread_rng().gen_range(0..2);
-                            self.particles[idx + self.width].active = true;
-                            self.particles[idx + self.width].already_updated = true;
-                            self.particles[idx].active = false;
-                        
-                    
-                    if belowIndex > -1 && self.particles[belowIndex as usize].active == true {
-                        let bl = v[3];
-                        let br = v[1];    
-                        if bl >-1 && self.particles[bl as usize].active == false{
-                            //let num = rand::thread_rng().gen_range(0..2);
-                            self.particles[bl as usize].active = true;
-                            self.particles[bl as usize].already_updated = true;
-                            self.particles[idx].active = false;
-                        }
-                        else if br >-1 && self.particles[br as usize].active == false{
-                            //let num = rand::thread_rng().gen_range(0..2);
-                            self.particles[br as usize].active = true;
-                            self.particles[br as usize].already_updated = true;
-                            self.particles[idx].active = false;
-                        }
-                    }
-                }
-                    //println!("Cell at index {}, x,y {},{} is alive", idx, x,y);
-                    
-                    
-                    //println!("converting x,y {},{} back to idx is {:?}", x,y, self.grid_idx(x,y));
-                    //    println!("Killing cell and dropping particle to the cell bellow us at {}", idx+self.width);
-                    
-                    if self.particles[idx + self.width].active == false {
-                        //let num = rand::thread_rng().gen_range(0..2);
-                        self.particles[idx + self.width].active = true;
-                        self.particles[idx + self.width].already_updated = true;
-                        self.particles[idx].active = false;
-                    }
-                } */
-        }
-        for y in 0..self.height {
-            for x in 0..self.width {
-                let idx = x + y * self.width;
-                self.particles[idx].already_updated = false;
-            }
-        }
+        // for y in 0..self.height {
+        //     for x in 0..self.width {
+        //         let idx = x + y * self.width;
+        //         self.particles[idx].already_updated = false;
+        //     }
+        // }
     }
 
     fn toggle(&mut self, x: isize, y: isize) -> bool {
         if let Some(i) = self.grid_idx(x, y) {
             let was_active = self.particles[i].active;
             self.particles[i].set_active(!was_active);
+            self.particles[i].already_updated = false;
+            self.particles[i].p_type = self.active_type;
             !was_active
         } else {
             false
@@ -395,12 +449,23 @@ impl ConwayGrid {
     fn draw(&self, screen: &mut [u8]) {
         debug_assert_eq!(screen.len(), 4 * self.particles.len());
         for (c, pix) in self.particles.iter().zip(screen.chunks_exact_mut(4)) {
+            let mut color = [0, 0x00, 0x00, 0x00];
+
+            if c.p_type ==1{
+                color = [0x96, 0x4b, 0x00, 0xff];    
+            }
+            else if c.p_type == 2{
+                color = [0, 0xff, 0xff, 0xff];
+            }
+
+            pix.copy_from_slice(&color);
+           /*
             let color = if c.active {
                 [0, 0xff, 0xff, 0xff]
             } else {
                 [0, 0, 0, 0xff]
             };
-            pix.copy_from_slice(&color);
+            pix.copy_from_slice(&color); */
         }
     }
 
@@ -413,6 +478,8 @@ impl ConwayGrid {
         for (x, y) in line_drawing::Bresenham::new((x0, y0), (x1, y1)) {
             if let Some(i) = self.grid_idx(x, y) {
                 self.particles[i].set_active(active);
+                self.particles[i].already_updated = false;
+                self.particles[i].p_type = self.active_type;
             } else {
                 break;
             }
@@ -427,7 +494,7 @@ impl ConwayGrid {
 
 
 
-            /* Given an index in the array of X this function will return the index on the 8
+        /* Given an index in the array of X this function will return the index on the 8
         neighbors in an array of len 8 where array[0] is the cell to the immediate right of ?
         and the continue in a clowise fashion. If the cell is touching an edge of the game board the value 
         for neighbors that are off the board is -1
@@ -437,7 +504,6 @@ impl ConwayGrid {
         [4]   X   [0]
 
         [3]  [2]  [1]
-
 
         Example 1) Cell X is in the middle of a 3x3 game board
 
@@ -453,7 +519,6 @@ impl ConwayGrid {
         -1  0  1
         -1  3  4
         The returned vector is <1,4,3,-1,-1,-1,-1,-1>
-
         */
     fn getEightNeighbors(&self, idx: usize) -> Vec<isize> {
         let coord = self.getXYfromInx(idx);
