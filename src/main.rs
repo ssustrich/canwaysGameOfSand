@@ -21,6 +21,7 @@ enum OBJECT_TYPES {
     SAND,
     WATER,
 }
+
 fn main() -> Result<(), Error> {
     env_logger::Builder::from_env(
         Env::default().default_filter_or("error,conways_gos=info"),
@@ -70,6 +71,15 @@ fn main() -> Result<(), Error> {
             if input.key_pressed(VirtualKeyCode::Space) {
                 // Space is frame-step, so ensure we're paused
                 paused = true;
+            }
+            if input.key_pressed(VirtualKeyCode::R) {
+                frame.randomize();
+            }
+            if input.key_pressed(VirtualKeyCode::Key1) {
+                frame.set_brush_type(1)
+            }
+            if input.key_pressed(VirtualKeyCode::Key2) {
+                frame.set_brush_type(2)
             }
             if input.key_pressed(VirtualKeyCode::R) {
                 frame.randomize();
@@ -241,6 +251,7 @@ struct ConwayGrid {
     particles: Vec<Particle>,
     width: usize,
     height: usize,
+    active_type: usize,
     // Should always be the same size as `cells`. When updating, we read from
     // `cells` and write to `scratch_cells`, then swap. Otherwise it's not in
     // use, and `cells` should be updated directly.
@@ -254,9 +265,13 @@ impl ConwayGrid {
         Self {
             particles: vec![Particle::default(); size],
             scratch_cells: vec![Particle::default(); size],
+            active_type: 1,
             width,
             height,
         }
+    }
+    fn set_brush_type(&mut self, brush_type: usize){
+        self.active_type = brush_type;
     }
 
     fn new_random(width: usize, height: usize) -> Self {
@@ -287,6 +302,122 @@ impl ConwayGrid {
             self.update();
         }
     }
+
+    fn update_water(&mut self, idx: usize){
+        log::debug!("{:?}", self.particles[idx]);
+        //check to see if we can move down
+        let mut v: Vec<isize> = self.getEightNeighbors(idx);
+        let mut ui = v[6];
+        let mut ul = v[5];
+        let mut ur = v[7];
+        
+        //we hit the bottom
+        if ui == -1 {
+            self.particles[idx].active = true; 
+            self.particles[idx].already_updated = true;
+        }
+        else if ui > -1 && self.particles[ui as usize].active {
+            if rand::random(){
+                ul ^= ur;
+                ur ^= ul;
+                ul ^= ur;
+            }
+       
+            //check bl  (which may be swapped)
+            if ul > -1 && !self.particles[ui as usize].active {
+                self.particles[idx].already_updated = true;
+                self.particles[idx].active = false;
+                self.particles[ul as usize].active = true;
+                self.particles[ul as usize].p_type = self.particles[idx].p_type;
+                self.particles[idx].p_type = 0;
+            }
+            else if ur > -1 && !self.particles[ur as usize].active {
+                self.particles[idx].already_updated = true;
+                self.particles[idx].active = false;
+                self.particles[ur as usize].active = true;
+                self.particles[ur as usize].p_type = self.particles[idx].p_type;
+                self.particles[idx].p_type = 0;
+
+
+            } else{
+            self.particles[idx].already_updated = true;
+            self.particles[idx].active = true; 
+            }
+        }
+        else {
+            self.particles[idx].already_updated = true;
+            self.particles[idx].active = false;
+
+            self.particles[ui as usize].active = true;
+            self.particles[ui as usize].p_type = self.particles[idx].p_type;
+            self.particles[idx].p_type = 0;
+        }
+
+
+    }
+    fn update_sand(&mut self, idx: usize){ 
+
+        log::debug!("{:?}", self.particles[idx]);
+        //check to see if we can move down
+        let mut v: Vec<isize> = self.getEightNeighbors(idx);
+        let mut bi = v[2];
+        let mut bl = v[3];
+        let mut br = v[1];
+        
+        //we hit the bottom
+        if bi == -1 {
+            self.particles[idx].active = false; 
+            self.particles[idx].already_updated = true;
+        }
+        else /*&& self.particles[bi as usize].active */{
+            // if rand::random(){
+            //     bl ^= br;
+            //     br ^= bl;
+            //     bl ^= br;
+            // }
+       
+            //check bl  (which may be swapped)
+/*            if bl > -1 && !self.particles[bi as usize].active {
+                self.particles[idx].already_updated = true;
+               // self.particles[idx].active = false;
+             //   self.particles[bl as usize].active = true;
+                self.particles[bl as usize].p_type = self.particles[idx].p_type;
+                self.particles[idx].p_type = 0;
+            }
+            else if br > -1 && !self.particles[br as usize].active {
+                self.particles[idx].already_updated = true;
+              //  self.particles[idx].active = false;
+             //   self.particles[br as usize].active = true;
+                self.particles[br as usize].p_type = self.particles[idx].p_type;
+                self.particles[idx].p_type = 0;
+
+
+            } */
+            
+          //  else{
+            self.particles[idx].already_updated = true;
+            if !self.particles[bi as usize].p_type == 0{
+              self.particles[idx].active = self.particles[bi as usize].active;
+            }
+            else {
+                self.particles[idx].already_updated = true;
+                self.particles[idx].active = false;
+    
+                self.particles[bi as usize].active = true;
+                self.particles[bi as usize].p_type = self.particles[idx].p_type;
+                self.particles[idx].p_type = 0;
+            }
+        }
+        // else {
+        //     self.particles[idx].already_updated = true;
+        //     self.particles[idx].active = false;
+
+        //     self.particles[bi as usize].active = true;
+        //     self.particles[bi as usize].p_type = self.particles[idx].p_type;
+        //     self.particles[idx].p_type = 0;
+        // }
+
+       }
 
     fn update(&mut self) {
         let mut counter = 0;
@@ -426,6 +557,13 @@ impl ConwayGrid {
         //     }
         // }
         }
+
+        // for y in 0..self.height {
+        //     for x in 0..self.width {
+        //         let idx = x + y * self.width;
+        //         self.particles[idx].already_updated = false;
+        //     }
+        // }
     }
 
     fn toggle(&mut self, x: isize, y: isize) -> bool {
