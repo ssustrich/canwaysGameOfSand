@@ -23,7 +23,7 @@ enum OBJECT_TYPES {
 }
 fn main() -> Result<(), Error> {
     env_logger::Builder::from_env(
-        Env::default().default_filter_or("debug,conways_gos=debug"),
+        Env::default().default_filter_or("error,conways_gos=info"),
     )
     .init();
     log::info!("World dimensions: {}x{}", SCREEN_WIDTH, SCREEN_HEIGHT);
@@ -305,6 +305,7 @@ impl ConwayGrid {
 
                 
                 counter+=1;
+                println!("counter is now {} ", counter);
                 //println!("executing loop counter {}",counter);
                 log::debug!("{:?}", self.particles[idx]);
                 //check to see if we can move down
@@ -436,12 +437,14 @@ impl ConwayGrid {
             self.particles[i].set_active(!was_active);
             println!("Now its active state is {}",  self.particles[i].active);
 
-            if was_active {
-                self.particles[i].p_type = 0;
+            if !was_active {
+                self.particles[i].p_type = 1;
+                self.particles[i].already_updated = !true;
                 println!("p_type is {}",  self.particles[i].p_type);
             }
             else{
-                self.particles[i].p_type = 1;
+                self.particles[i].p_type = 0;
+                self.particles[i].already_updated = true;
                 println!("p type is  {}",  self.particles[i].p_type);
             }
             
