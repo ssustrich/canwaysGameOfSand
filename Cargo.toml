@@ -4,6 +4,11 @@ version = "0.1.0"
 edition = "2018"
 publish = false
 
+[lib]
+name = "lib"
+path = "src/lib.rs"
+
+
 [features]
 optimize = ["log/release_max_level_warn"]
 default = ["optimize"]
